@@ -1,26 +1,26 @@
-namespace RedisService.CommandLine;
+namespace ValkeyService.CommandLine;
 
 /// <summary>
-/// 命令行解析器
+/// Command-line parser
 /// </summary>
 public static class CommandLineParser
 {
     /// <summary>
-    /// 解析命令行参数
+    /// Parse command-line arguments
     /// </summary>
     public static CommandResult Parse(string[] args)
     {
         if (args.Length == 0)
             return new HelpCommand();
 
-        // 检查帮助和版本标志
+        // Check help and version flags
         if (HasFlag(args, "-h", "--help"))
             return new HelpCommand();
 
         if (HasFlag(args, "-v", "--version"))
             return new VersionCommand();
 
-        // 解析命令
+        // Parse command
         var command = args[0].ToLowerInvariant();
 
         return command switch
@@ -28,7 +28,7 @@ public static class CommandLineParser
             "install" => ParseInstallCommand(args),
             "uninstall" => ParseUninstallCommand(args),
             "run" => ParseRunCommand(args, 1),
-            _ => ParseRunCommand(args, 0) // 默认为 run 命令
+            _ => ParseRunCommand(args, 0) // Default to run command
         };
     }
 
@@ -37,7 +37,7 @@ public static class CommandLineParser
         var options = new InstallOptions();
         ParseRunOptions(args, 1, options);
 
-        // 解析安装特有选项
+        // Parse install-specific options
         for (int i = 1; i < args.Length; i++)
         {
             switch (args[i].ToLowerInvariant())
@@ -100,7 +100,7 @@ public static class CommandLineParser
         var options = new RunOptions();
         ParseRunOptions(args, startIndex, options);
         options.AsService = !options.Foreground;
-        return new RunCommand(options);
+            return new RunCommand(options);
     }
 
     private static void ParseRunOptions(string[] args, int startIndex, RunOptions options)
@@ -153,49 +153,49 @@ public static class CommandLineParser
     }
 
     /// <summary>
-    /// 显示帮助信息
+    /// Print help text
     /// </summary>
     public static void PrintHelp()
     {
         Console.WriteLine(@"
-RedisService - Redis Windows Service Wrapper
+ValkeyService - Valkey Windows Service Wrapper
 
-用法: RedisService [command] [options]
+Usage: ValkeyService [command] [options]
 
-命令:
-  install       安装为 Windows 服务
-  uninstall     卸载 Windows 服务
-  run           运行 Redis（默认命令）
+Commands:
+  install       Install as a Windows service
+  uninstall     Uninstall the Windows service
+  run           Run Valkey (default command)
 
-选项:
-  -c, --config <FILE>      Redis 配置文件路径 (默认: redis.conf)
-  --port <PORT>            覆盖 Redis 端口
-  --dir <DIRECTORY>        覆盖 Redis 数据目录
-  --loglevel <LEVEL>       日志级别 (debug, verbose, notice, warning)
-  -f, --foreground         前台运行模式
-  --service-name <NAME>    服务名称 (默认: Redis)
-  --display-name <NAME>    服务显示名称
-  --description <TEXT>     服务描述
-  --start-mode <MODE>      启动类型: auto, manual (默认: auto)
-  -h, --help               显示帮助
-  -v, --version            显示版本
+Options:
+  -c, --config <FILE>      Valkey config file path (default: valkey.conf)
+  --port <PORT>            Override Valkey port
+  --dir <DIRECTORY>        Override Valkey data directory
+  --loglevel <LEVEL>       Log level (debug, verbose, notice, warning)
+  -f, --foreground         Run in foreground
+  --service-name <NAME>    Service name (default: Valkey)
+  --display-name <NAME>    Service display name
+  --description <TEXT>     Service description
+  --start-mode <MODE>      Start mode: auto, manual (default: auto)
+  -h, --help               Show help
+  -v, --version            Show version
 
-示例:
-  RedisService.exe install -c redis.conf --port 6380
-  RedisService.exe run --foreground
-  RedisService.exe uninstall
-  RedisService.exe uninstall --service-name MyRedis
+Examples:
+  ValkeyService.exe install -c valkey.conf --port 6380
+  ValkeyService.exe run --foreground
+  ValkeyService.exe uninstall
+  ValkeyService.exe uninstall --service-name MyValkey
 ");
     }
 
     /// <summary>
-    /// 显示版本信息
+    /// Print version information
     /// </summary>
     public static void PrintVersion()
     {
         var version = typeof(CommandLineParser).Assembly.GetName().Version;
-        Console.WriteLine($"RedisService version {version?.ToString() ?? "1.0.0"}");
-        Console.WriteLine("Redis Windows Service Wrapper");
-        Console.WriteLine("https://github.com/redis-windows/redis-windows");
+        Console.WriteLine($"ValkeyService version {version?.ToString() ?? "1.0.0"}");
+        Console.WriteLine("Valkey Windows Service Wrapper");
+        Console.WriteLine("https://github.com/valkey-windows/valkey-windows");
     }
 }

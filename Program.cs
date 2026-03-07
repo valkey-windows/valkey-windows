@@ -1,11 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using RedisService.CommandLine;
-using RedisService.Native;
-using RedisService.Service;
+using ValkeyService.CommandLine;
+using ValkeyService.Native;
+using ValkeyService.Service;
 
-namespace RedisService;
+namespace ValkeyService;
 
 class Program
 {
@@ -21,18 +21,18 @@ class Program
                 VersionCommand => PrintVersion(),
                 InstallCommand cmd => InstallService(cmd),
                 UninstallCommand cmd => UninstallService(cmd),
-                RunCommand cmd => await RunRedis(cmd),
+                RunCommand cmd => await RunValkey(cmd),
                 _ => PrintHelp()
             };
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"错误: {ex.Message}");
+            Console.Error.WriteLine($"Error: {ex.Message}");
             return 1;
         }
     }
 
-    #region 命令处理
+    #region Command Handling
 
     private static int PrintHelp()
     {
@@ -50,22 +50,22 @@ class Program
     {
         var options = cmd.Options;
 
-        Console.WriteLine($"正在安装服务 '{options.ServiceName}'...");
+        Console.WriteLine($"Installing service '{options.ServiceName}'...");
 
-        // 获取当前可执行文件路径
+        // Get current executable path
         var exePath = Environment.ProcessPath
             ?? AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar) + ".exe";
 
-        // 构建服务参数
+        // Build service arguments
         var serviceArgs = new List<string>();
 
-        // 添加 run 命令（服务模式）
+        // Add run command (service mode)
         serviceArgs.Add("run");
 
-        // 添加配置文件参数
+        // Add config file argument
         serviceArgs.Add($"-c \"{Path.GetFullPath(options.ConfigFilePath)}\"");
 
-        // 添加其他参数
+        // Add other arguments
         if (options.Port.HasValue)
             serviceArgs.Add($"--port {options.Port.Value}");
 
@@ -75,7 +75,7 @@ class Program
         if (!string.IsNullOrEmpty(options.LogLevel))
             serviceArgs.Add($"--loglevel {options.LogLevel}");
 
-        // 构建完整的二进制路径
+        // Build full binary path
         var binaryPath = $"\"{exePath}\" {string.Join(" ", serviceArgs)}";
 
         try
@@ -83,44 +83,44 @@ class Program
             ServiceManager.InstallService(
                 options.ServiceName,
                 binaryPath,
-                options.DisplayName ?? "Redis Server",
-                options.Description ?? "Redis in-memory data structure store",
+                options.DisplayName ?? "Valkey Server",
+                options.Description ?? "Valkey in-memory data structure store",
                 options.StartMode);
 
-            Console.WriteLine($"服务 '{options.ServiceName}' 安装成功。");
+            Console.WriteLine($"Service '{options.ServiceName}' installed successfully.");
             Console.WriteLine();
 
-            // 询问是否启动服务
+            // Ask whether to start the service
             if (options.StartMode == "auto")
             {
-                Console.WriteLine("正在启动服务...");
+                Console.WriteLine("Starting service...");
                 try
                 {
                     ServiceManager.StartServiceByName(options.ServiceName);
-                    Console.WriteLine("服务已启动。");
+                    Console.WriteLine("Service started.");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"启动服务失败: {ex.Message}");
-                    Console.WriteLine($"请手动运行: sc start {options.ServiceName}");
+                    Console.WriteLine($"Failed to start service: {ex.Message}");
+                    Console.WriteLine($"Please run manually: sc start {options.ServiceName}");
                 }
             }
             else
             {
-                Console.WriteLine($"使用以下命令启动服务: sc start {options.ServiceName}");
+                Console.WriteLine($"Start the service with: sc start {options.ServiceName}");
             }
 
             return 0;
         }
         catch (InvalidOperationException ex)
         {
-            Console.Error.WriteLine($"错误: {ex.Message}");
+            Console.Error.WriteLine($"Error: {ex.Message}");
             return 1;
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
-            Console.Error.WriteLine($"错误: {ex.Message}");
-            Console.Error.WriteLine("请以管理员身份运行此程序。");
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Console.Error.WriteLine("Please run this program as administrator.");
             return 1;
         }
     }
@@ -129,33 +129,33 @@ class Program
     {
         var serviceName = cmd.Options.ServiceName;
 
-        Console.WriteLine($"正在卸载服务 '{serviceName}'...");
+        Console.WriteLine($"Uninstalling service '{serviceName}'...");
 
         try
         {
             ServiceManager.UninstallService(serviceName);
-            Console.WriteLine($"服务 '{serviceName}' 卸载成功。");
+            Console.WriteLine($"Service '{serviceName}' uninstalled successfully.");
             return 0;
         }
         catch (InvalidOperationException ex)
         {
-            Console.Error.WriteLine($"错误: {ex.Message}");
+            Console.Error.WriteLine($"Error: {ex.Message}");
             return 1;
         }
         catch (System.ComponentModel.Win32Exception ex)
         {
-            Console.Error.WriteLine($"错误: {ex.Message}");
-            Console.Error.WriteLine("请以管理员身份运行此程序。");
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Console.Error.WriteLine("Please run this program as administrator.");
             return 1;
         }
     }
 
-    private static async Task<int> RunRedis(RunCommand cmd)
+    private static async Task<int> RunValkey(RunCommand cmd)
     {
         var options = cmd.Options;
 
-        // 构建配置
-        var config = new RedisConfiguration
+        // Build configuration
+        var config = new ValkeyConfiguration
         {
             ConfigFilePath = options.ConfigFilePath,
             Port = options.Port,
@@ -165,35 +165,35 @@ class Program
 
         if (options.Foreground)
         {
-            // 前台模式运行
+            // Run in foreground
             return await RunForegroundAsync(config);
         }
         else
         {
-            // Windows 服务模式运行
+            // Run as Windows service
             return await RunAsServiceAsync(config);
         }
     }
 
-    private static async Task<int> RunForegroundAsync(RedisConfiguration config)
+    private static async Task<int> RunForegroundAsync(ValkeyConfiguration config)
     {
-        Console.WriteLine("正在以前台模式启动 Redis...");
+        Console.WriteLine("Starting Valkey in foreground...");
 
-        using var processManager = new RedisProcessManager(config);
+        using var processManager = new ValkeyProcessManager(config);
 
-        // 处理 Ctrl+C
+        // Handle Ctrl+C
         var cts = new CancellationTokenSource();
         Console.CancelKeyPress += (sender, e) =>
         {
             e.Cancel = true;
-            Console.WriteLine("\n正在停止...");
+            Console.WriteLine("\nStopping...");
             cts.Cancel();
         };
 
-        // 进程退出时自动关闭
+        // Stop automatically when the process exits
         processManager.ProcessExited += (sender, e) =>
         {
-            Console.WriteLine($"Redis 进程已退出 (退出码: {e.ExitCode})");
+            Console.WriteLine($"Valkey process exited (exit code: {e.ExitCode})");
             cts.Cancel();
         };
 
@@ -202,36 +202,36 @@ class Program
             var started = await processManager.StartAsync(cts.Token);
             if (!started)
             {
-                Console.Error.WriteLine("启动 Redis 失败");
+                Console.Error.WriteLine("Failed to start Valkey");
                 return 1;
             }
 
-            Console.WriteLine($"Redis 已启动 (PID: {processManager.ProcessId})");
-            Console.WriteLine("按 Ctrl+C 停止...");
+            Console.WriteLine($"Valkey started (PID: {processManager.ProcessId})");
+            Console.WriteLine("Press Ctrl+C to stop...");
 
-            // 等待取消信号
+            // Wait for cancellation
             await Task.Delay(Timeout.Infinite, cts.Token);
         }
         catch (OperationCanceledException)
         {
-            // 正常退出
+            // Expected exit
         }
         finally
         {
-            Console.WriteLine("正在停止 Redis...");
+            Console.WriteLine("Stopping Valkey...");
             await processManager.StopAsync();
         }
 
         return 0;
     }
 
-    private static async Task<int> RunAsServiceAsync(RedisConfiguration config)
+    private static async Task<int> RunAsServiceAsync(ValkeyConfiguration config)
     {
         var host = Host.CreateDefaultBuilder()
             .UseWindowsService()
             .ConfigureLogging(logging =>
             {
-#pragma warning disable CA1416 // 平台兼容性警告：AddEventLog 仅在 Windows 上可用
+#pragma warning disable CA1416 // Platform compatibility warning: AddEventLog is Windows-only
                 logging.AddEventLog();
 #pragma warning restore CA1416
                 logging.SetMinimumLevel(LogLevel.Information);
@@ -239,8 +239,8 @@ class Program
             .ConfigureServices((context, services) =>
             {
                 services.AddSingleton(config);
-                services.AddSingleton<RedisProcessManager>();
-                services.AddHostedService<RedisBackgroundService>();
+                services.AddSingleton<ValkeyProcessManager>();
+                services.AddHostedService<ValkeyBackgroundService>();
             })
             .Build();
 
@@ -252,15 +252,15 @@ class Program
 }
 
 /// <summary>
-/// Redis 后台服务（用于 Windows 服务模式）
+/// Valkey background service (Windows service mode)
 /// </summary>
-public class RedisBackgroundService : BackgroundService
+public class ValkeyBackgroundService : BackgroundService
 {
-    private readonly RedisConfiguration _config;
-    private readonly ILogger<RedisBackgroundService> _logger;
-    private readonly RedisProcessManager _processManager;
+    private readonly ValkeyConfiguration _config;
+    private readonly ILogger<ValkeyBackgroundService> _logger;
+    private readonly ValkeyProcessManager _processManager;
 
-    public RedisBackgroundService(RedisConfiguration config, RedisProcessManager processManager, ILogger<RedisBackgroundService> logger)
+    public ValkeyBackgroundService(ValkeyConfiguration config, ValkeyProcessManager processManager, ILogger<ValkeyBackgroundService> logger)
     {
         _config = config;
         _processManager = processManager;
@@ -269,42 +269,42 @@ public class RedisBackgroundService : BackgroundService
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("正在启动 Redis 服务...");
+        _logger.LogInformation("Starting Valkey service...");
 
         _processManager.ProcessExited += OnProcessExited;
 
         var started = await _processManager.StartAsync(cancellationToken);
         if (!started)
         {
-            _logger.LogError("启动 Redis 进程失败");
-            throw new InvalidOperationException("无法启动 Redis 进程");
+            _logger.LogError("Failed to start Valkey process");
+            throw new InvalidOperationException("Unable to start Valkey process");
         }
 
-        _logger.LogInformation("Redis 服务已启动 (PID: {ProcessId})", _processManager.ProcessId);
+        _logger.LogInformation("Valkey service started (PID: {ProcessId})", _processManager.ProcessId);
 
         await base.StartAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // 保持服务运行
+        // Keep the service running
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("正在停止 Redis 服务...");
+        _logger.LogInformation("Stopping Valkey service...");
 
         _processManager.ProcessExited -= OnProcessExited;
         await _processManager.StopAsync(cancellationToken);
 
-        _logger.LogInformation("Redis 服务已停止");
+        _logger.LogInformation("Valkey service stopped");
 
         await base.StopAsync(cancellationToken);
     }
 
     private void OnProcessExited(object? sender, ProcessExitedEventArgs e)
     {
-        _logger.LogWarning("Redis 进程意外退出 (退出码: {ExitCode})", e.ExitCode);
+        _logger.LogWarning("Valkey process exited unexpectedly (exit code: {ExitCode})", e.ExitCode);
     }
 }

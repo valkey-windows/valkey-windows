@@ -1,4 +1,4 @@
 @echo off
 cd /d %~dp0
-redis-server.exe redis.conf
+valkey-server.exe valkey.conf
 pause

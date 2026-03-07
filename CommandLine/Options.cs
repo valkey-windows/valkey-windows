@@ -1,38 +1,38 @@
-namespace RedisService.CommandLine;
+namespace ValkeyService.CommandLine;
 
 /// <summary>
-/// 命令类型
+/// Command types
 /// </summary>
 public enum CommandType
 {
     /// <summary>
-    /// 显示帮助
+    /// Show help
     /// </summary>
     Help,
 
     /// <summary>
-    /// 显示版本
+    /// Show version
     /// </summary>
     Version,
 
     /// <summary>
-    /// 安装服务
+    /// Install service
     /// </summary>
     Install,
 
     /// <summary>
-    /// 卸载服务
+    /// Uninstall service
     /// </summary>
     Uninstall,
 
     /// <summary>
-    /// 运行 Redis
+    /// Run Valkey
     /// </summary>
     Run
 }
 
 /// <summary>
-/// 命令行解析结果基类
+/// Base class for parsed command results
 /// </summary>
 public abstract class CommandResult(CommandType type)
 {
@@ -40,7 +40,7 @@ public abstract class CommandResult(CommandType type)
 }
 
 /// <summary>
-/// 帮助命令结果
+/// Help command result
 /// </summary>
 public class HelpCommand : CommandResult
 {
@@ -48,7 +48,7 @@ public class HelpCommand : CommandResult
 }
 
 /// <summary>
-/// 版本命令结果
+/// Version command result
 /// </summary>
 public class VersionCommand : CommandResult
 {
@@ -56,43 +56,43 @@ public class VersionCommand : CommandResult
 }
 
 /// <summary>
-/// 运行选项
+/// Options for running Valkey
 /// </summary>
 public class RunOptions
 {
     /// <summary>
-    /// 配置文件路径
+    /// Config file path
     /// </summary>
-    public string ConfigFilePath { get; set; } = "redis.conf";
+    public string ConfigFilePath { get; set; } = "valkey.conf";
 
     /// <summary>
-    /// Redis 端口
+    /// Valkey port
     /// </summary>
     public int? Port { get; set; }
 
     /// <summary>
-    /// 数据目录
+    /// Data directory
     /// </summary>
     public string? DataDirectory { get; set; }
 
     /// <summary>
-    /// 日志级别
+    /// Log level
     /// </summary>
     public string? LogLevel { get; set; }
 
     /// <summary>
-    /// 前台运行模式
+    /// Run in foreground
     /// </summary>
     public bool Foreground { get; set; }
 
     /// <summary>
-    /// 作为 Windows 服务运行
+    /// Run as a Windows service
     /// </summary>
     public bool AsService { get; set; }
 }
 
 /// <summary>
-/// 运行命令结果
+/// Run command result
 /// </summary>
 public class RunCommand : CommandResult
 {
@@ -105,33 +105,33 @@ public class RunCommand : CommandResult
 }
 
 /// <summary>
-/// 安装选项
+/// Install options
 /// </summary>
 public class InstallOptions : RunOptions
 {
     /// <summary>
-    /// 服务名称
+    /// Service name
     /// </summary>
-    public string ServiceName { get; set; } = "Redis";
+    public string ServiceName { get; set; } = "Valkey";
 
     /// <summary>
-    /// 服务显示名称
+    /// Service display name
     /// </summary>
     public string? DisplayName { get; set; }
 
     /// <summary>
-    /// 服务描述
+    /// Service description
     /// </summary>
     public string? Description { get; set; }
 
     /// <summary>
-    /// 启动类型: auto, manual, disabled
+    /// Start mode: auto, manual, disabled
     /// </summary>
     public string StartMode { get; set; } = "auto";
 }
 
 /// <summary>
-/// 安装命令结果
+/// Install command result
 /// </summary>
 public class InstallCommand : CommandResult
 {
@@ -144,18 +144,18 @@ public class InstallCommand : CommandResult
 }
 
 /// <summary>
-/// 卸载选项
+/// Uninstall options
 /// </summary>
 public class UninstallOptions
 {
     /// <summary>
-    /// 服务名称
+    /// Service name
     /// </summary>
-    public string ServiceName { get; set; } = "Redis";
+    public string ServiceName { get; set; } = "Valkey";
 }
 
 /// <summary>
-/// 卸载命令结果
+/// Uninstall command result
 /// </summary>
 public class UninstallCommand : CommandResult
 {

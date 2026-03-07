@@ -1,12 +1,12 @@
-name: Manual Build Redis
+name: Manual Build Valkey
 
 on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Redis Version'
+        description: 'Valkey Version'
         required: true
-        default: "7.0.14"
+        default: "8.0.7"
         type: string
       make_latest:
         description: 'Mark as Latest Release'
@@ -18,8 +18,8 @@ on:
         type: boolean
 
 jobs:
-  build-redis:
-    uses: ./.github/workflows/build-redis.yml
+  build-valkey:
+    uses: ./.github/workflows/build-valkey.yml
     with:
       release_version: ${{ inputs.tag_name }}
       make_latest: ${{ inputs.make_latest }}

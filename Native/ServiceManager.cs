@@ -1,14 +1,14 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 
-namespace RedisService.Native;
+namespace ValkeyService.Native;
 
 /// <summary>
-/// Windows 服务管理器（通过 P/Invoke）
+/// Windows service manager (via P/Invoke)
 /// </summary>
 public static class ServiceManager
 {
-    #region P/Invoke 声明
+    #region P/Invoke declarations
 
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern IntPtr OpenSCManager(
@@ -75,33 +75,33 @@ public static class ServiceManager
 
     #endregion
 
-    #region 常量
+    #region Constants
 
-    // 访问权限
+    // Access rights
     private const uint SC_MANAGER_ALL_ACCESS = 0xF003F;
     private const uint SERVICE_ALL_ACCESS = 0xF01FF;
 
-    // 服务类型
+    // Service types
     private const uint SERVICE_WIN32_OWN_PROCESS = 0x10;
 
-    // 启动类型
+    // Start types
     private const uint SERVICE_AUTO_START = 0x2;
     private const uint SERVICE_DEMAND_START = 0x3;
     private const uint SERVICE_DISABLED = 0x4;
 
-    // 错误控制
+    // Error control
     private const uint SERVICE_ERROR_NORMAL = 0x1;
 
-    // 服务控制
+    // Service control
     private const uint SERVICE_CONTROL_STOP = 0x1;
 
-    // 服务状态
+    // Service states
     private const uint SERVICE_STOPPED = 0x1;
     private const uint SERVICE_START_PENDING = 0x2;
     private const uint SERVICE_STOP_PENDING = 0x3;
     private const uint SERVICE_RUNNING = 0x4;
 
-    // 错误码
+    // Error codes
     private const int ERROR_SERVICE_EXISTS = 1073;
     private const int ERROR_SERVICE_DOES_NOT_EXIST = 1060;
     private const int ERROR_SERVICE_MARKED_FOR_DELETE = 1072;
@@ -109,7 +109,7 @@ public static class ServiceManager
     #endregion
 
     /// <summary>
-    /// 安装 Windows 服务
+    /// Install a Windows service
     /// </summary>
     public static void InstallService(
         string serviceName,
@@ -121,7 +121,7 @@ public static class ServiceManager
         var scManager = OpenSCManager(null, null, SC_MANAGER_ALL_ACCESS);
         if (scManager == IntPtr.Zero)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "无法打开服务管理器，请以管理员身份运行");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to open service manager; please run as administrator");
         }
 
         try
@@ -154,14 +154,14 @@ public static class ServiceManager
                 var error = Marshal.GetLastWin32Error();
                 if (error == ERROR_SERVICE_EXISTS)
                 {
-                    throw new InvalidOperationException($"服务 '{serviceName}' 已存在");
+                    throw new InvalidOperationException($"Service '{serviceName}' already exists");
                 }
-                throw new Win32Exception(error, "创建服务失败");
+                throw new Win32Exception(error, "Failed to create service");
             }
 
             try
             {
-                // 设置服务描述（可选）
+                // Set service description (optional)
                 if (!string.IsNullOrEmpty(description))
                 {
                     SetServiceDescription(service, description);
@@ -179,14 +179,14 @@ public static class ServiceManager
     }
 
     /// <summary>
-    /// 卸载 Windows 服务
+    /// Uninstall a Windows service
     /// </summary>
     public static void UninstallService(string serviceName)
     {
         var scManager = OpenSCManager(null, null, SC_MANAGER_ALL_ACCESS);
         if (scManager == IntPtr.Zero)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "无法打开服务管理器，请以管理员身份运行");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to open service manager; please run as administrator");
         }
 
         try
@@ -197,14 +197,14 @@ public static class ServiceManager
                 var error = Marshal.GetLastWin32Error();
                 if (error == ERROR_SERVICE_DOES_NOT_EXIST)
                 {
-                    throw new InvalidOperationException($"服务 '{serviceName}' 不存在");
+                    throw new InvalidOperationException($"Service '{serviceName}' does not exist");
                 }
-                throw new Win32Exception(error, "打开服务失败");
+                throw new Win32Exception(error, "Failed to open service");
             }
 
             try
             {
-                // 先尝试停止服务
+                // Attempt to stop the service first
                 StopService(service);
 
                 if (!DeleteService(service))
@@ -212,9 +212,9 @@ public static class ServiceManager
                     var error = Marshal.GetLastWin32Error();
                     if (error == ERROR_SERVICE_MARKED_FOR_DELETE)
                     {
-                        throw new InvalidOperationException($"服务 '{serviceName}' 已标记为删除，请重启系统后完成删除");
+                        throw new InvalidOperationException($"Service '{serviceName}' is marked for deletion; please reboot to complete removal");
                     }
-                    throw new Win32Exception(error, "删除服务失败");
+                    throw new Win32Exception(error, "Failed to delete service");
                 }
             }
             finally
@@ -229,14 +229,14 @@ public static class ServiceManager
     }
 
     /// <summary>
-    /// 启动服务
+    /// Start a service
     /// </summary>
     public static void StartServiceByName(string serviceName)
     {
         var scManager = OpenSCManager(null, null, SC_MANAGER_ALL_ACCESS);
         if (scManager == IntPtr.Zero)
         {
-            throw new Win32Exception(Marshal.GetLastWin32Error(), "无法打开服务管理器");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Unable to open service manager");
         }
 
         try
@@ -244,14 +244,14 @@ public static class ServiceManager
             var service = OpenService(scManager, serviceName, SERVICE_ALL_ACCESS);
             if (service == IntPtr.Zero)
             {
-                throw new Win32Exception(Marshal.GetLastWin32Error(), "打开服务失败");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to open service");
             }
 
             try
             {
                 if (!StartService(service, 0, null))
                 {
-                    throw new Win32Exception(Marshal.GetLastWin32Error(), "启动服务失败");
+                    throw new Win32Exception(Marshal.GetLastWin32Error(), "Failed to start service");
                 }
             }
             finally
@@ -266,7 +266,7 @@ public static class ServiceManager
     }
 
     /// <summary>
-    /// 停止服务
+    /// Stop a service
     /// </summary>
     private static void StopService(IntPtr service)
     {
@@ -275,14 +275,14 @@ public static class ServiceManager
         if (!ControlService(service, SERVICE_CONTROL_STOP, ref status))
         {
             var error = Marshal.GetLastWin32Error();
-            // 服务可能已经停止
+            // Service may already be stopped
             if (error != 1062) // ERROR_SERVICE_NOT_ACTIVE
             {
-                // 忽略停止失败，继续尝试删除
+                // Ignore stop failure, continue trying to delete
             }
         }
 
-        // 等待服务停止
+        // Wait for the service to stop
         for (int i = 0; i < 30; i++)
         {
             if (!QueryServiceStatus(service, ref status))
@@ -296,17 +296,17 @@ public static class ServiceManager
     }
 
     /// <summary>
-    /// 设置服务描述
+    /// Set service description
     /// </summary>
     private static void SetServiceDescription(IntPtr service, string description)
     {
-        // 使用 ChangeServiceConfig2 设置描述
-        // 这里简化处理，不设置描述
-        // 完整实现需要更多 P/Invoke 声明
+        // Use ChangeServiceConfig2 to set description
+        // Simplified here; description not set
+        // A full implementation requires additional P/Invoke declarations
     }
 
     /// <summary>
-    /// 检查服务是否存在
+    /// Check whether a service exists
     /// </summary>
     public static bool ServiceExists(string serviceName)
     {

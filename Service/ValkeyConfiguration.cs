@@ -1,47 +1,47 @@
 using System.Text;
 
-namespace RedisService.Service;
+namespace ValkeyService.Service;
 
 /// <summary>
-/// Redis 服务配置
+/// Valkey service configuration
 /// </summary>
-public class RedisConfiguration
+public class ValkeyConfiguration
 {
     /// <summary>
-    /// Redis 配置文件路径
+    /// Valkey config file path
     /// </summary>
-    public string ConfigFilePath { get; init; } = "redis.conf";
+    public string ConfigFilePath { get; init; } = "valkey.conf";
 
     /// <summary>
-    /// Redis 端口（覆盖配置文件中的设置）
+    /// Valkey port (overrides config file)
     /// </summary>
     public int? Port { get; init; }
 
     /// <summary>
-    /// Redis 数据目录（覆盖配置文件中的设置）
+    /// Valkey data directory (overrides config file)
     /// </summary>
     public string? DataDirectory { get; init; }
 
     /// <summary>
-    /// 日志级别（覆盖配置文件中的设置）
+    /// Log level (overrides config file)
     /// </summary>
     public string? LogLevel { get; init; }
 
     /// <summary>
-    /// 优雅关闭超时时间（毫秒）
+    /// Graceful shutdown timeout in milliseconds
     /// </summary>
     public int GracefulShutdownTimeoutMs { get; init; } = 5000;
 
     /// <summary>
-    /// 进程启动超时时间（毫秒）
+    /// Process start timeout in milliseconds
     /// </summary>
     public int ProcessStartTimeoutMs { get; init; } = 3000;
 
     /// <summary>
-    /// 将 Windows 路径转换为 Cygwin/MSYS2 风格路径
+    /// Convert a Windows path to a Cygwin/MSYS2 style path
     /// </summary>
-    /// <param name="windowsPath">Windows 路径</param>
-    /// <returns>Cygwin 风格路径 (如 /cygdrive/c/path)</returns>
+    /// <param name="windowsPath">Windows path</param>
+    /// <returns>Cygwin-style path (e.g., /cygdrive/c/path)</returns>
     public static string ToCygwinPath(string windowsPath)
     {
         var path = Path.GetFullPath(windowsPath);
@@ -58,7 +58,7 @@ public class RedisConfiguration
     }
 
     /// <summary>
-    /// 获取 Cygwin 风格的配置文件路径
+    /// Get the config path in Cygwin format
     /// </summary>
     public string GetCygwinConfigPath()
     {
@@ -66,7 +66,7 @@ public class RedisConfiguration
     }
 
     /// <summary>
-    /// 获取 Cygwin 风格的数据目录路径
+    /// Get the data directory path in Cygwin format
     /// </summary>
     public string? GetCygwinDataDirectory()
     {
@@ -74,16 +74,16 @@ public class RedisConfiguration
     }
 
     /// <summary>
-    /// 构建 redis-server 命令行参数
+    /// Build valkey-server command-line arguments
     /// </summary>
     public string BuildArguments()
     {
         var args = new StringBuilder();
 
-        // 配置文件（必需，用于 Cygwin 路径）
+        // Config file (required for Cygwin path)
         args.Append($"\"{GetCygwinConfigPath()}\"");
 
-        // 覆盖选项
+        // Override options
         if (Port.HasValue)
             args.Append($" --port {Port.Value}");
 
@@ -97,24 +97,24 @@ public class RedisConfiguration
     }
 
     /// <summary>
-    /// 构建 redis-cli SHUTDOWN 命令行参数
+    /// Build valkey-cli SHUTDOWN command-line arguments
     /// </summary>
     public string BuildCliShutdownArguments()
     {
         var args = new StringBuilder();
 
-        // 传递配置文件路径（确保 redis-cli 知道正确的 dir）
+        // Pass config path (ensures valkey-cli uses correct dir)
         args.Append($"\"{GetCygwinConfigPath()}\"");
 
-        // 传递端口覆盖
+        // Pass port override
         if (Port.HasValue)
             args.Append($" -p {Port.Value}");
 
-        // 传递 dir 覆盖
+        // Pass dir override
         if (!string.IsNullOrEmpty(DataDirectory))
             args.Append($" --dir \"{GetCygwinDataDirectory()}\"");
 
-        // SHUTDOWN 命令
+        // SHUTDOWN command
         args.Append(" SHUTDOWN");
 
         return args.ToString();
