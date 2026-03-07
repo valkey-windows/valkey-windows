@@ -1,48 +1,48 @@
-# Redis for Windows
+# Valkey for Windows
 
-[![Build](https://github.com/redis-windows/redis-windows/actions/workflows/build-redis.yml/badge.svg)](https://github.com/redis-windows/redis-windows/actions)
-[![Release](https://img.shields.io/github/v/release/redis-windows/redis-windows)](https://github.com/redis-windows/redis-windows/releases)
+[![Build](https://github.com/valkey-windows/valkey-windows/actions/workflows/build-valkey.yml/badge.svg)](https://github.com/valkey-windows/valkey-windows/actions)
+[![Release](https://img.shields.io/github/v/release/valkey-windows/valkey-windows)](https://github.com/valkey-windows/valkey-windows/releases)
 
-Compiled from official Redis source for Windows.
+Compiled from official Valkey source for Windows.
 
 ## Quick Start
 
 ```cmd
 # After download and extract
-redis-server.exe redis.conf
+valkey-server.exe valkey.conf
 
-# Or use RedisService (recommended)
-RedisService.exe run --foreground
+# Or use ValkeyService (recommended)
+ValkeyService.exe run --foreground
 ```
 
 ## Usage
 
-### Option 1: RedisService.exe (Recommended)
+### Option 1: ValkeyService.exe (Recommended)
 
 Automatically handles path conversion. Use native Windows paths.
 
 ```cmd
 # Run in foreground
-RedisService.exe run --foreground --port 6379 --dir C:\redis-data
+ValkeyService.exe run --foreground --port 6379 --dir C:\valkey-data
 
 # Install as Windows service
-RedisService.exe install -c C:\config\redis.conf --dir D:\data\redis --port 6379
-net start Redis
+ValkeyService.exe install -c C:\config\valkey.conf --dir D:\data\valkey --port 6379
+net start Valkey
 
 # Uninstall service
-RedisService.exe uninstall
+ValkeyService.exe uninstall
 ```
 
-### Option 2: redis-server.exe (Direct)
+### Option 2: valkey-server.exe (Direct)
 
 **Important:** This build uses Cygwin runtime. Command-line paths must use Cygwin format.
 
 ```cmd
 # ✅ Correct - Cygwin path format
-redis-server.exe /cygdrive/c/config/redis.conf --dir /cygdrive/d/data --port 6379
+valkey-server.exe /cygdrive/c/config/valkey.conf --dir /cygdrive/d/data --port 6379
 
 # ❌ Wrong - Windows paths not supported
-redis-server.exe C:\config\redis.conf --dir D:\data
+valkey-server.exe C:\config\valkey.conf --dir D:\data
 ```
 
 **Path Conversion:**
@@ -56,20 +56,20 @@ redis-server.exe C:\config\redis.conf --dir D:\data
 **In config file:** Use forward slashes (Windows style with `/`).
 
 ```conf
-# Recommended in redis.conf
-dir C:/redis/data
-logfile C:/redis/logs/redis.log
+# Recommended in valkey.conf
+dir C:/valkey/data
+logfile C:/valkey/logs/valkey.log
 ```
 
-## RedisService CLI Reference
+## ValkeyService CLI Reference
 
 ```cmd
-RedisService.exe [command] [options]
+ValkeyService.exe [command] [options]
 
 Commands:
   install       Install as Windows service
   uninstall     Uninstall Windows service
-  run           Run Redis (default)
+  run           Run Valkey (default)
 
 Options:
   -c, --config <FILE>      Config file path
@@ -77,7 +77,7 @@ Options:
   --dir <DIRECTORY>        Data directory
   --loglevel <LEVEL>       Log level (debug/verbose/notice/warning)
   -f, --foreground         Run in foreground
-  --service-name <NAME>    Service name (default: Redis)
+  --service-name <NAME>    Service name (default: Valkey)
   --start-mode <MODE>      Startup type (auto/manual)
   -h, --help               Show help
   -v, --version            Show version
@@ -88,60 +88,60 @@ Options:
 Config, data, and program can be in any location:
 
 ```cmd
-# Program: C:\redis\RedisService.exe
-# Config:  D:\config\redis.conf
-# Data:    E:\data\redis
+# Program: C:\valkey\ValkeyService.exe
+# Config:  D:\config\valkey.conf
+# Data:    E:\data\valkey
 
-RedisService.exe run -c D:\config\redis.conf --dir E:\data\redis --foreground
+ValkeyService.exe run -c D:\config\valkey.conf --dir E:\data\valkey --foreground
 ```
 
 ## Data Persistence
 
-Data is saved automatically on shutdown. `RedisService.exe` correctly passes `--dir` to ensure data is saved to the specified directory.
+Data is saved automatically on shutdown. `ValkeyService.exe` correctly passes `--dir` to ensure data is saved to the specified directory.
 
 ```cmd
 # Start
-RedisService.exe run --foreground --dir C:\redis-data
+ValkeyService.exe run --foreground --dir C:\valkey-data
 
 # Write data
-redis-cli SET mykey myvalue
+valkey-cli SET mykey myvalue
 
 # Graceful shutdown
-redis-cli SHUTDOWN
+valkey-cli SHUTDOWN
 
 # Restart - data persists
-redis-cli GET mykey   # Returns "myvalue"
+valkey-cli GET mykey   # Returns "myvalue"
 ```
 
 ## FAQ
 
-### redis-server.exe can't find config file?
+### valkey-server.exe can't find config file?
 
 Use Cygwin path format:
 ```cmd
-redis-server.exe /cygdrive/c/config/redis.conf
+valkey-server.exe /cygdrive/c/config/valkey.conf
 ```
 
-Or use `RedisService.exe` which handles path conversion automatically.
+Or use `ValkeyService.exe` which handles path conversion automatically.
 
 ### Data lost after restart?
 
 1. Always specify `--dir` option
-2. Use graceful shutdown (`redis-cli SHUTDOWN` or `Ctrl+C`), don't kill the process
+2. Use graceful shutdown (`valkey-cli SHUTDOWN` or `Ctrl+C`), don't kill the process
 3. Use the same `--dir` when restarting
 
 ## Technical Details
 
 - Build toolchain: MSYS2 / Cygwin
 - Service wrapper: .NET 10.0
-- Path handling: RedisService auto-converts Windows ↔ Cygwin paths
+- Path handling: ValkeyService auto-converts Windows ↔ Cygwin paths
 
 ---
 
-English | [简体中文](README.ko_KR.md)
+English | [한국어](README.ko_KR.md)
 
 ## Disclaimer
 
-This project is not affiliated with, endorsed by, or sponsored by Redis Ltd. The license provided here applies only to this repository, not to the official Redis project.
+This project is not affiliated with, endorsed by, or sponsored by LF Projects, LLC. The license provided here applies only to this repository, not to the official Valkey project.
 
-This is recommended for local development only. For production environments, please follow Redis official guidance and deploy on Linux. This project is not responsible for any losses caused by its use.
+This is recommended for local development only. For production environments, please follow Valkey official guidance and deploy on Linux. This project is not responsible for any losses caused by its use.

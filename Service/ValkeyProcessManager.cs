@@ -1,67 +1,67 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
-namespace RedisService.Service;
+namespace ValkeyService.Service;
 
 /// <summary>
-/// Redis 进程管理器
+/// Valkey process manager
 /// </summary>
-public class RedisProcessManager : IDisposable
+public class ValkeyProcessManager : IDisposable
 {
-    private Process? _redisProcess;
-    private readonly RedisConfiguration _config;
-    private readonly ILogger<RedisProcessManager>? _logger;
+    private Process? _valkeyProcess;
+    private readonly ValkeyConfiguration _config;
+    private readonly ILogger<ValkeyProcessManager>? _logger;
     private readonly SemaphoreSlim _startLock = new(1, 1);
     private bool _disposed;
 
     /// <summary>
-    /// 进程退出事件
+    /// Process exit event
     /// </summary>
     public event EventHandler<ProcessExitedEventArgs>? ProcessExited;
 
-    public RedisProcessManager(RedisConfiguration config, ILogger<RedisProcessManager>? logger = null)
+    public ValkeyProcessManager(ValkeyConfiguration config, ILogger<ValkeyProcessManager>? logger = null)
     {
         _config = config;
         _logger = logger;
     }
 
     /// <summary>
-    /// 进程是否正在运行
+    /// Whether the process is running
     /// </summary>
-    public bool IsRunning => _redisProcess != null && !_redisProcess.HasExited;
+    public bool IsRunning => _valkeyProcess != null && !_valkeyProcess.HasExited;
 
     /// <summary>
-    /// 进程 ID
+    /// Process ID
     /// </summary>
-    public int? ProcessId => _redisProcess?.Id;
+    public int? ProcessId => _valkeyProcess?.Id;
 
     /// <summary>
-    /// 启动 Redis 进程
+    /// Start the Valkey process
     /// </summary>
     public async Task<bool> StartAsync(CancellationToken cancellationToken = default)
     {
         await _startLock.WaitAsync(cancellationToken);
         try
         {
-            if (_redisProcess != null && !_redisProcess.HasExited)
+            if (_valkeyProcess != null && !_valkeyProcess.HasExited)
             {
-                _logger?.LogWarning("Redis 进程已在运行中");
+                _logger?.LogWarning("Valkey process is already running");
                 return true;
             }
 
             var basePath = AppContext.BaseDirectory;
-            var redisServerPath = Path.Combine(basePath, "redis-server.exe");
+            var valkeyServerPath = Path.Combine(basePath, "valkey-server.exe");
 
-            if (!File.Exists(redisServerPath))
+            if (!File.Exists(valkeyServerPath))
             {
-                _logger?.LogError("找不到 redis-server.exe: {Path}", redisServerPath);
+                _logger?.LogError("valkey-server.exe not found: {Path}", valkeyServerPath);
                 return false;
             }
 
             var arguments = _config.BuildArguments();
-            _logger?.LogInformation("启动 Redis: {Path} {Args}", redisServerPath, arguments);
+            _logger?.LogInformation("Starting Valkey: {Path} {Args}", valkeyServerPath, arguments);
 
-            var startInfo = new ProcessStartInfo(redisServerPath, arguments)
+            var startInfo = new ProcessStartInfo(valkeyServerPath, arguments)
             {
                 WorkingDirectory = basePath,
                 UseShellExecute = false,
@@ -70,34 +70,34 @@ public class RedisProcessManager : IDisposable
                 RedirectStandardError = true
             };
 
-            _redisProcess = Process.Start(startInfo);
+            _valkeyProcess = Process.Start(startInfo);
 
-            if (_redisProcess == null)
+            if (_valkeyProcess == null)
             {
-                _logger?.LogError("无法启动 Redis 进程");
+                _logger?.LogError("Failed to start Valkey process");
                 return false;
             }
 
-            // 启用事件处理
-            _redisProcess.EnableRaisingEvents = true;
-            _redisProcess.Exited += OnProcessExited;
-            _redisProcess.OutputDataReceived += OnOutputDataReceived;
-            _redisProcess.ErrorDataReceived += OnErrorDataReceived;
+            // Enable event handling
+            _valkeyProcess.EnableRaisingEvents = true;
+            _valkeyProcess.Exited += OnProcessExited;
+            _valkeyProcess.OutputDataReceived += OnOutputDataReceived;
+            _valkeyProcess.ErrorDataReceived += OnErrorDataReceived;
 
-            // 开始异步读取输出
-            _redisProcess.BeginOutputReadLine();
-            _redisProcess.BeginErrorReadLine();
+            // Start reading output asynchronously
+            _valkeyProcess.BeginOutputReadLine();
+            _valkeyProcess.BeginErrorReadLine();
 
-            // 等待一小段时间确认进程已启动
+            // Brief wait to confirm the process has started
             await Task.Delay(100, cancellationToken);
 
-            if (_redisProcess.HasExited)
+            if (_valkeyProcess.HasExited)
             {
-                _logger?.LogError("Redis 进程立即退出，退出码: {ExitCode}", _redisProcess.ExitCode);
+                _logger?.LogError("Valkey process exited immediately, exit code: {ExitCode}", _valkeyProcess.ExitCode);
                 return false;
             }
 
-            _logger?.LogInformation("Redis 进程已启动，PID: {ProcessId}", _redisProcess.Id);
+            _logger?.LogInformation("Valkey process started, PID: {ProcessId}", _valkeyProcess.Id);
             return true;
         }
         finally
@@ -107,40 +107,40 @@ public class RedisProcessManager : IDisposable
     }
 
     /// <summary>
-    /// 停止 Redis 进程
+    /// Stop the Valkey process
     /// </summary>
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        if (_redisProcess == null || _redisProcess.HasExited)
+        if (_valkeyProcess == null || _valkeyProcess.HasExited)
         {
-            _logger?.LogDebug("Redis 进程未运行");
+            _logger?.LogDebug("Valkey process is not running");
             return;
         }
 
-        _logger?.LogInformation("正在停止 Redis 进程...");
+        _logger?.LogInformation("Stopping Valkey process...");
 
-        // 尝试优雅关闭
+        // Attempt graceful shutdown
         await TryGracefulShutdownAsync(cancellationToken);
 
-        // 使用优化的异步等待
+        // Optimized async wait
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cts.CancelAfter(_config.GracefulShutdownTimeoutMs);
 
         try
         {
-            await WaitForExitAsync(_redisProcess, cts.Token);
-            _logger?.LogInformation("Redis 进程已优雅关闭");
+            await WaitForExitAsync(_valkeyProcess, cts.Token);
+            _logger?.LogInformation("Valkey process shut down gracefully");
         }
         catch (OperationCanceledException)
         {
-            _logger?.LogWarning("优雅关闭超时，强制终止进程");
+            _logger?.LogWarning("Graceful shutdown timed out; terminating process");
             try
             {
-                _redisProcess.Kill(entireProcessTree: true);
+                _valkeyProcess.Kill(entireProcessTree: true);
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "强制终止进程失败");
+                _logger?.LogError(ex, "Failed to terminate process forcibly");
             }
         }
 
@@ -148,27 +148,27 @@ public class RedisProcessManager : IDisposable
     }
 
     /// <summary>
-    /// 尝试通过 redis-cli 优雅关闭
+    /// Attempt graceful shutdown via valkey-cli
     /// </summary>
     private async Task TryGracefulShutdownAsync(CancellationToken cancellationToken)
     {
         var basePath = AppContext.BaseDirectory;
-        var redisCliPath = Path.Combine(basePath, "redis-cli.exe");
+        var valkeyCliPath = Path.Combine(basePath, "valkey-cli.exe");
 
-        if (!File.Exists(redisCliPath))
+        if (!File.Exists(valkeyCliPath))
         {
-            _logger?.LogWarning("找不到 redis-cli.exe，跳过优雅关闭");
+            _logger?.LogWarning("valkey-cli.exe not found; skipping graceful shutdown");
             return;
         }
 
-        // 构建完整的 redis-cli 参数（包含配置文件路径和 dir 参数）
-        // 这样 redis-cli 就能找到正确的数据目录进行保存
+        // Build full valkey-cli arguments (includes config path and dir)
+        // Ensures valkey-cli uses the correct data directory for persistence
         var args = _config.BuildCliShutdownArguments();
-        _logger?.LogDebug("执行 redis-cli {Args}", args);
+        _logger?.LogDebug("Running valkey-cli {Args}", args);
 
         try
         {
-            using var cli = Process.Start(new ProcessStartInfo(redisCliPath, args)
+            using var cli = Process.Start(new ProcessStartInfo(valkeyCliPath, args)
             {
                 WorkingDirectory = basePath,
                 UseShellExecute = false,
@@ -179,26 +179,26 @@ public class RedisProcessManager : IDisposable
 
             if (cli != null)
             {
-                // 设置超时，避免无限等待
+                // Apply timeout to avoid waiting indefinitely
                 using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 cts.CancelAfter(TimeSpan.FromSeconds(10));
 
                 await cli.WaitForExitAsync(cts.Token);
-                _logger?.LogDebug("已发送 SHUTDOWN 命令，退出码: {ExitCode}", cli.ExitCode);
+                _logger?.LogDebug("Sent SHUTDOWN command, exit code: {ExitCode}", cli.ExitCode);
             }
         }
         catch (OperationCanceledException)
         {
-            _logger?.LogWarning("redis-cli SHUTDOWN 命令超时");
+            _logger?.LogWarning("valkey-cli SHUTDOWN command timed out");
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex, "发送 SHUTDOWN 命令失败");
+            _logger?.LogWarning(ex, "Failed to send SHUTDOWN command");
         }
     }
 
     /// <summary>
-    /// 异步等待进程退出（性能优化：不阻塞线程池）
+    /// Asynchronously wait for process exit (non-blocking)
     /// </summary>
     private static Task WaitForExitAsync(Process process, CancellationToken cancellationToken)
     {
@@ -215,14 +215,14 @@ public class RedisProcessManager : IDisposable
 
         process.Exited += OnExited;
 
-        // 处理已退出的情况
+        // Handle already exited
         if (process.HasExited)
         {
             process.Exited -= OnExited;
             return Task.CompletedTask;
         }
 
-        // 注册取消
+        // Register cancellation
         cancellationToken.Register(() =>
         {
             process.Exited -= OnExited;
@@ -236,7 +236,7 @@ public class RedisProcessManager : IDisposable
     {
         var process = sender as Process;
         var exitCode = process?.ExitCode ?? -1;
-        _logger?.LogWarning("Redis 进程意外退出，退出码: {ExitCode}", exitCode);
+        _logger?.LogWarning("Valkey process exited unexpectedly, exit code: {ExitCode}", exitCode);
 
         ProcessExited?.Invoke(this, new ProcessExitedEventArgs(exitCode, process?.StartTime ?? DateTime.MinValue, DateTime.Now));
 
@@ -247,7 +247,7 @@ public class RedisProcessManager : IDisposable
     {
         if (!string.IsNullOrEmpty(e.Data))
         {
-            _logger?.LogInformation("[Redis] {Data}", e.Data);
+            _logger?.LogInformation("[Valkey] {Data}", e.Data);
         }
     }
 
@@ -255,23 +255,23 @@ public class RedisProcessManager : IDisposable
     {
         if (!string.IsNullOrEmpty(e.Data))
         {
-            _logger?.LogError("[Redis] {Data}", e.Data);
+            _logger?.LogError("[Valkey] {Data}", e.Data);
         }
     }
 
     private void CleanupProcess()
     {
-        if (_redisProcess != null)
+        if (_valkeyProcess != null)
         {
             try
             {
-                _redisProcess.Exited -= OnProcessExited;
-                _redisProcess.OutputDataReceived -= OnOutputDataReceived;
-                _redisProcess.ErrorDataReceived -= OnErrorDataReceived;
-                _redisProcess.Dispose();
+                _valkeyProcess.Exited -= OnProcessExited;
+                _valkeyProcess.OutputDataReceived -= OnOutputDataReceived;
+                _valkeyProcess.ErrorDataReceived -= OnErrorDataReceived;
+                _valkeyProcess.Dispose();
             }
             catch { }
-            _redisProcess = null;
+            _valkeyProcess = null;
         }
     }
 
@@ -286,7 +286,7 @@ public class RedisProcessManager : IDisposable
 }
 
 /// <summary>
-/// 进程退出事件参数
+/// Process exit event args
 /// </summary>
 public class ProcessExitedEventArgs(int exitCode, DateTime startTime, DateTime exitTime) : EventArgs
 {
