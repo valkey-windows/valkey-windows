@@ -138,7 +138,7 @@ Or use `RedisService.exe` which handles path conversion automatically.
 
 ---
 
-English | [简体中文](README.zh_CN.md)
+English | [简体中文](README.ko_KR.md)
 
 ## Disclaimer
 
