@@ -19,6 +19,9 @@ on:
         description: "The version of Valkey being built"
         value: ${{ jobs.prepare.outputs.release_version }}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   prepare:
     runs-on: windows-latest
@@ -27,7 +30,7 @@ jobs:
       valkey_dist: ${{ env.VALKEY_DIST }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup environment
         id: setup
@@ -42,7 +45,7 @@ jobs:
           $releaseInfo.body -Replace '\#1', 'https://github.com/valkey-io/valkey/pull/1' | Set-Content .\valkey_latest_body.txt
 
       - name: Setup .NET 10.0
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -51,7 +54,7 @@ jobs:
           dotnet publish -c Release -r win-x64 --sc -o publish
 
       - name: Upload source and ValkeyService.exe
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: valkey-source
           path: |
@@ -64,10 +67,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: valkey-source
 
@@ -77,7 +80,7 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value "VALKEY_DIST=${{ needs.prepare.outputs.valkey_dist }}"
 
       - name: Cache MSYS2 packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             C:/msys64/var/cache/pacman/pkg
@@ -105,6 +108,9 @@ jobs:
           echo '" Valkey for Windows Project Home \n"' >> asciilogo.h
           echo '" https://github.com/valkey-windows/valkey-windows  \n\n";' >> asciilogo.h
           sed -i 's/all: \(.*\) module_tests$/all: \1/' Makefile
+          if [ -f modules/lua/engine_lua.c ]; then
+            sed -i 's/^int ValkeyModule_OnLoad_lua(/__attribute__((dllexport)) int ValkeyModule_OnLoad_lua(/' modules/lua/engine_lua.c
+          fi
           cd ..
 
           # Build Valkey (ensure asprintf is declared on MinGW/Cygwin)
@@ -136,16 +142,49 @@ jobs:
       - name: Test Valkey with MSYS2
         timeout-minutes: 5
         run: |
+          $dist = ".\${{ env.VALKEY_DIST }}-msys2-with-Service"
+          $port = 6380
+          $stdoutLog = Join-Path $dist "valkey-server.stdout.log"
+          $stderrLog = Join-Path $dist "valkey-server.stderr.log"
+          $server = $null
+
           try {
-            Start-Process -NoNewWindow -FilePath ".\${{ env.VALKEY_DIST }}-msys2-with-Service\valkey-server.exe"
-            Start-Sleep -Seconds 2
-            $value = .\${{ env.VALKEY_DIST }}-msys2-with-Service\valkey-cli.exe SET test_key test_value
+            $server = Start-Process `
+              -FilePath "$dist\valkey-server.exe" `
+              -ArgumentList @("valkey.conf", "--dir", ".", "--port", "$port") `
+              -WorkingDirectory $dist `
+              -RedirectStandardOutput $stdoutLog `
+              -RedirectStandardError $stderrLog `
+              -PassThru
+
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              if ($server.HasExited) { break }
+              $pong = & "$dist\valkey-cli.exe" -p $port PING 2>$null
+              if ($LASTEXITCODE -eq 0 -and $pong -eq "PONG") {
+                $ready = $true
+                break
+              }
+              Start-Sleep -Seconds 1
+            }
+
+            if (-not $ready) {
+              if (Test-Path $stdoutLog) { Get-Content $stdoutLog }
+              if (Test-Path $stderrLog) { Get-Content $stderrLog }
+              if ($server.HasExited) { throw "valkey-server exited before accepting connections, exit code: $($server.ExitCode)" }
+              throw "valkey-server did not accept connections on port $port"
+            }
+
+            $value = & "$dist\valkey-cli.exe" -p $port SET test_key test_value
             if ($LASTEXITCODE -ne 0) { throw "Failed to set test key" }
-            $value = .\${{ env.VALKEY_DIST }}-msys2-with-Service\valkey-cli.exe GET test_key
+            $value = & "$dist\valkey-cli.exe" -p $port GET test_key
             if ($value -ne "test_value") { throw "Test failed" }
           }
           finally {
-            Stop-Process -Name "valkey-server" -ErrorAction SilentlyContinue
+            & "$dist\valkey-cli.exe" -p $port SHUTDOWN NOSAVE 2>$null
+            if ($server -and -not $server.HasExited) {
+              Stop-Process -Id $server.Id -ErrorAction SilentlyContinue
+            }
           }
 
       - name: Calculate hash values for MSYS2 builds
@@ -156,7 +195,7 @@ jobs:
           Get-FileHash .\${{ env.VALKEY_DIST }}-msys2-with-Service.zip | Format-List | Out-File -Append hashes-msys2.txt
 
       - name: Upload MSYS2 builds
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: valkey-msys2-builds
           path: |
@@ -169,10 +208,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download source
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: valkey-source
 
@@ -182,16 +221,18 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value "VALKEY_DIST=${{ needs.prepare.outputs.valkey_dist }}"
 
       - name: Cache Cygwin packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
-            C:/cygwin64
-            C:/cygwin64/var/cache
+            D:/cygwin
+            D:/cygwin-packages
           key: cygwin-${{ runner.os }}-${{ hashFiles('.github/workflows/build-valkey.yml') }}
           restore-keys: cygwin-${{ runner.os }}-
 
-      - uses: cygwin/cygwin-install-action@master
+      - uses: cygwin/cygwin-install-action@v6
         with:
+          work-vol: 'D:'
+          install-dir: 'D:\cygwin'
           packages: make gcc-core gcc-g++ pkg-config libssl-devel zip
 
       - name: Build Valkey with Cygwin
@@ -209,6 +250,7 @@ jobs:
           echo '" Valkey for Windows Project Home \n"' >> asciilogo.h ;
           echo '" https://github.com/valkey-windows/valkey-windows  \n\n";' >> asciilogo.h ;
           sed -i 's/all: \(.*\) module_tests$/all: \1/' Makefile ;
+          [ ! -f modules/lua/engine_lua.c ] || sed -i 's/^int ValkeyModule_OnLoad_lua(/__attribute__((dllexport)) int ValkeyModule_OnLoad_lua(/' modules/lua/engine_lua.c ;
           cd .. ;
           make BUILD_TLS=yes CFLAGS="-Wno-char-subscripts -O0 -D_GNU_SOURCE -D__USE_MINGW_ANSI_STDIO" -j$(nproc) ;
           cd $workspace ;
@@ -234,16 +276,49 @@ jobs:
       - name: Test Valkey with Cygwin
         timeout-minutes: 5
         run: |
+          $dist = ".\${{ env.VALKEY_DIST }}-cygwin-with-Service"
+          $port = 6381
+          $stdoutLog = Join-Path $dist "valkey-server.stdout.log"
+          $stderrLog = Join-Path $dist "valkey-server.stderr.log"
+          $server = $null
+
           try {
-            Start-Process -NoNewWindow -FilePath ".\${{ env.VALKEY_DIST }}-cygwin-with-Service\valkey-server.exe"
-            Start-Sleep -Seconds 2
-            $value = .\${{ env.VALKEY_DIST }}-cygwin-with-Service\valkey-cli.exe SET test_key test_value
+            $server = Start-Process `
+              -FilePath "$dist\valkey-server.exe" `
+              -ArgumentList @("valkey.conf", "--dir", ".", "--port", "$port") `
+              -WorkingDirectory $dist `
+              -RedirectStandardOutput $stdoutLog `
+              -RedirectStandardError $stderrLog `
+              -PassThru
+
+            $ready = $false
+            for ($i = 0; $i -lt 30; $i++) {
+              if ($server.HasExited) { break }
+              $pong = & "$dist\valkey-cli.exe" -p $port PING 2>$null
+              if ($LASTEXITCODE -eq 0 -and $pong -eq "PONG") {
+                $ready = $true
+                break
+              }
+              Start-Sleep -Seconds 1
+            }
+
+            if (-not $ready) {
+              if (Test-Path $stdoutLog) { Get-Content $stdoutLog }
+              if (Test-Path $stderrLog) { Get-Content $stderrLog }
+              if ($server.HasExited) { throw "valkey-server exited before accepting connections, exit code: $($server.ExitCode)" }
+              throw "valkey-server did not accept connections on port $port"
+            }
+
+            $value = & "$dist\valkey-cli.exe" -p $port SET test_key test_value
             if ($LASTEXITCODE -ne 0) { throw "Failed to set test key" }
-            $value = .\${{ env.VALKEY_DIST }}-cygwin-with-Service\valkey-cli.exe GET test_key
+            $value = & "$dist\valkey-cli.exe" -p $port GET test_key
             if ($value -ne "test_value") { throw "Test failed" }
           }
           finally {
-            Stop-Process -Name "valkey-server" -ErrorAction SilentlyContinue
+            & "$dist\valkey-cli.exe" -p $port SHUTDOWN NOSAVE 2>$null
+            if ($server -and -not $server.HasExited) {
+              Stop-Process -Id $server.Id -ErrorAction SilentlyContinue
+            }
           }
 
       - name: Calculate hash values for Cygwin builds
@@ -254,7 +329,7 @@ jobs:
           Get-FileHash .\${{ env.VALKEY_DIST }}-cygwin-with-Service.zip | Format-List | Out-File -Append hashes-cygwin.txt
 
       - name: Upload Cygwin builds
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: valkey-cygwin-builds
           path: |
@@ -267,7 +342,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set environment variables
         run: |
@@ -275,7 +350,7 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value "VALKEY_DIST=${{ needs.prepare.outputs.valkey_dist }}"
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
 
       - name: Prepare release
         run: |
@@ -290,7 +365,7 @@ jobs:
           "From workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" | Out-File -Append -FilePath release_body.txt
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           overwrite_files: false
           fail_on_unmatched_files: true

@@ -5,6 +5,9 @@ on:
     - cron: '0 1 * * *'  # Runs daily at 1:00 UTC
   workflow_dispatch:  # Also allow manual trigger
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   check-new-version:
     runs-on: windows-latest
@@ -13,36 +16,36 @@ jobs:
       valkey_version: ${{ steps.check.outputs.valkey_version }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check for new Valkey version
         id: check
         run: |
           # Ensure the version file exists
-          If (-not (Test-Path -Path .github\valkey_latest_version.txt)) { 
+          If (-not (Test-Path -Path .github\valkey_latest_version.txt)) {
             New-Item -Path .github -ItemType Directory -Force | Out-Null
             Add-Content -Path .github\valkey_latest_version.txt -Value "" -NoNewline
           }
-          
+
           # Fetch the latest Valkey release version
           $res = ConvertFrom-Json(Invoke-WebRequest -Headers @{'Authorization' = 'token ${{ secrets.GITHUB_TOKEN }}'} -Uri "https://api.github.com/repos/valkey-io/valkey/releases/latest").Content
           $currentVersion = Get-Content .github\valkey_latest_version.txt
-          
+
           # Exit if the version is unchanged
-          If ($res.tag_name -eq $currentVersion) { 
+          If ($res.tag_name -eq $currentVersion) {
             Write-Output "No new version found. Current: $currentVersion"
             echo "new_version_found=false" >> $env:GITHUB_OUTPUT
             exit 0
           }
-          
+
           # Set outputs when a new version is found
           echo "new_version_found=true" >> $env:GITHUB_OUTPUT
           echo "valkey_version=$($res.tag_name)" >> $env:GITHUB_OUTPUT
           Write-Output "New version found: $($res.tag_name) (current: $currentVersion)"
-          
+
           # Update the version file
           $res.tag_name | Out-File -FilePath .github\valkey_latest_version.txt -NoNewline -Encoding ascii
-          
+
           # Commit the updated version file
           git config user.name github-actions
           git config user.email github-actions@github.com

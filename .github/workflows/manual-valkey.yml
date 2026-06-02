@@ -6,7 +6,7 @@ on:
       tag_name:
         description: 'Valkey Version'
         required: true
-        default: "8.0.7"
+        default: "9.1.0"
         type: string
       make_latest:
         description: 'Mark as Latest Release'
