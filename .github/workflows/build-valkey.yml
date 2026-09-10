@@ -340,6 +340,8 @@ jobs:
   release:
     needs: [prepare, build-msys2, build-cygwin]
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v6
@@ -364,19 +366,31 @@ jobs:
           # Add workflow information
           "From workflow: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" | Out-File -Append -FilePath release_body.txt
 
-      - name: Release
+      # Assets can only be attached while the release is still a draft, so the
+      # release is created as a draft here and published in the next step.
+      - name: Create draft release
         uses: softprops/action-gh-release@v3
         with:
+          draft: true
           overwrite_files: false
           fail_on_unmatched_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
           name: Valkey ${{ env.RELEASE_VERSION }} for Windows
           tag_name: ${{ env.RELEASE_VERSION }}
           body_path: release_body.txt
-          make_latest: "${{ inputs.make_latest }}"
           prerelease: ${{ inputs.prerelease }}
           files: |
             valkey-cygwin-builds/${{ env.VALKEY_DIST }}-cygwin.zip
             valkey-cygwin-builds/${{ env.VALKEY_DIST }}-cygwin-with-Service.zip
             valkey-msys2-builds/${{ env.VALKEY_DIST }}-msys2.zip
             valkey-msys2-builds/${{ env.VALKEY_DIST }}-msys2-with-Service.zip
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "${{ env.RELEASE_VERSION }}" `
+            --repo "${{ github.repository }}" `
+            --draft=false `
+            --latest=${{ inputs.make_latest }} `
+            --prerelease=${{ inputs.prerelease }}
