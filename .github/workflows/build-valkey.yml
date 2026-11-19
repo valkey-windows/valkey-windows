@@ -91,7 +91,16 @@ jobs:
       - uses: msys2/setup-msys2@v2
         with:
           update: true
-          install: gcc make pkg-config libopenssl openssl-devel zip
+          install: gcc make pkg-config zip
+
+      - name: Install OpenSSL 3.5 LTS
+        run: |
+          base=https://repo.msys2.org/msys/x86_64
+          pacman -U --noconfirm --needed \
+            $base/libopenssl-3.5.4-1-x86_64.pkg.tar.zst \
+            $base/openssl-devel-3.5.4-1-x86_64.pkg.tar.zst
+          sed -i 's/^#\?IgnorePkg.*/IgnorePkg = libopenssl openssl-devel openssl/' /etc/pacman.conf
+        shell: msys2 {0}
 
       - name: Build Valkey with MSYS2
         run: |
